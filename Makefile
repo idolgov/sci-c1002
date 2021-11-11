@@ -35,12 +35,11 @@ env:
 	. env/bin/activate && pip3 install -r requirements.txt
 
 lint:
-	black -l 80 --check --diff *.py
-	pylint -j0 -d global-statement,bare-except,protected-access *.py
+	. env/bin/activate && black -l 80 --check --diff *.py && pylint -j0 *.py
 
 install:
 	@if [ -z "${CIRCUITPYTHON_PATH}" ]; then echo "Device missing!" && false; fi
 	rsync -avh --progress libs/ ${CIRCUITPYTHON_PATH}/lib/
 	cp code.py ${CIRCUITPYTHON_PATH}
 
-.PHONY: firmware lib flash env lint install
+.PHONY: firmware libs flash env lint install

@@ -1,9 +1,10 @@
-# SCI-C1002 User-driver product development project
+# SCI-C1002 User-driver product development project: Lapsipaimen
 
-## About
+![Tests](https://github.com/idolgov/sci-c1002/actions/workflows/test.yaml/badge.svg)
 
-An early prototype of a vibration bracelet for helping parents to
-stress less about kids getting lost.
+An early prototype of a vibration bracelet for helping parents to stress less
+about kids getting lost, developed as part of the SCI-C1002 course of Aalto
+University.
 
 ## Components
 
@@ -52,9 +53,8 @@ errors, you'll need to create a python virtual environment with dependencies
 first:
 
     make env
-    source env/bin/activate
     make lint
 
-Now install the code and required libraries:
+Now install the code and required libraries on the device:
 
     make install
