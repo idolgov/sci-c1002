@@ -179,7 +179,7 @@ def connect():
 
     for adv in ble.start_scan(
         ProvideServicesAdvertisement, timeout=1, minimum_rssi=-100
-        ):
+    ):
         if UARTService not in adv.services:
             continue
 
