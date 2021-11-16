@@ -1,2 +1,2 @@
 [MESSAGES CONTROL]
-disable=global-statement, bare-except, protected-access
+disable=global-statement, bare-except, protected-access, too-many-branches, missing-function-docstring

@@ -40,7 +40,7 @@ TODO:
 - Try decreasing connection and advertising intervals to improve
   RSSI accuracy and stability
   - connection.connection_interval can be x*1.25
-  
+
 - Always alert when not connected
 """
 
