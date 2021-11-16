@@ -22,15 +22,15 @@ Features:
 
 - Turn the device off on action button long press
 
+- Low battery alert
+  - Threshold for low battery currently 3.6 V
+  - Blink red LED instead of blue every 4-5s when voltage too low
+
 TODO:
 
 - Implement lower and upper thresholds for RSSI/distance
   - ATM alerts are too sensitive near the single threshold
   - use lower one when alert is on and higher one when it is off
-
-- Implement low battery alert
-  - Test what is a good threshold for a 3.7V battery
-  - Blink red LED instead of blue every 4-5s when voltage too low
 
 - Calculate distance instead of just measuring RSSI
   - Distance == 10^((Measured power – RSSI)/(10 * N))
@@ -94,6 +94,7 @@ COLORS = {
 BLE_MAC_CENTRAL = "f4:a7:b4:0b:c7:36"
 BLE_MAC_PERIPHERAL = "e2:6d:58:bd:ec:4b"
 BLE_RSSI_THRESHOLD = -80
+LOW_BATTERY_THRESHOLD = 3.6
 
 LED_STATUS_SECONDS = 5
 
@@ -144,6 +145,14 @@ def vibrate(effect=HAPTIC_EFFECT_NOTIFY, level=HAPTIC_EFFECT_NOTIFY_LEVEL):
     drv.play()
 
 
+def low_battery():
+    is_low_battery = False
+    lipo_voltage = (lipo_voltage_raw.value * 3.6) / 65536 * 2
+    if lipo_voltage < LOW_BATTERY_THRESHOLD:
+        is_low_battery = True
+    return is_low_battery
+
+
 def blink(color, duration=0.5, count=1):
     """Flash neopixel led.
 
@@ -183,6 +192,7 @@ def connect():
             continue
 
         addr = bytes_to_mac(adv.address.address_bytes)
+        time.sleep(0.2)
         ble_rssi.append(adv.rssi)
         if len(ble_rssi) > 10:
             ble_rssi.pop(0)
@@ -344,7 +354,10 @@ while True:
     elif not alert_state and now > status_timestamp + LED_STATUS_SECONDS:
         status_timestamp = now
 
-        blink(COLOR_BLUE, 0.25)
+        if low_battery():
+            blink(COLOR_RED, 0.25)
+        else:
+            blink(COLOR_BLUE, 0.25)
 
     # Try to connect or wait for connection
     if ble_is_central:
