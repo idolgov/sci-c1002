@@ -37,7 +37,7 @@ env:
 lint:
 	. env/bin/activate && black -l 80 --color --check --diff *.py && pylint -j0 *.py
 
-install:
+install: lint
 	@if [ -z "${CIRCUITPYTHON_PATH}" ]; then echo "Device missing!" && false; fi
 	rsync -avh --progress libs/ ${CIRCUITPYTHON_PATH}/lib/
 	cp code.py ${CIRCUITPYTHON_PATH}

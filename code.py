@@ -118,7 +118,6 @@ pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
 ble = BLERadio()
 
 ble_is_central = d5.value
-ble_connection = None
 ble_rssi = []
 btn_state = btn.value
 btn_timestamp = 0
@@ -239,9 +238,9 @@ def wait_for_connection():
     """Wait for a connection from a central device."""
     global alert_state
 
-    # print(f"Connecting...")
-
     if not ble._adapter.advertising:
+        print("Connecting...")
+
         ble.start_advertising(advertisement)
 
     if not ble.connected:
@@ -254,12 +253,15 @@ def wait_for_connection():
     if addr == BLE_MAC_CENTRAL:
         print(f"Connected to {addr}")
 
-        # Receive state
-        alert_state = bool(int(uart.readline().decode("utf8")))
+        data = uart.readline().decode("utf8").strip()
 
-        print(f"Received alert state: {alert_state}")
+        if data:
+            # Receive state
+            alert_state = bool(int(data))
 
-    ble.stop_advertising()
+            print(f"Received alert state: {alert_state}")
+
+    # ble.stop_advertising()
 
 
 def reboot():
