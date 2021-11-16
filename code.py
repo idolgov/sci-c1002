@@ -1,4 +1,3 @@
-# Write your code here :-)
 """Lapsipaimen proto based on Adafruit Feather M0 Express.
 
 Features:
@@ -17,10 +16,11 @@ Features:
   - Blink yellow LED every second
 
 - Action button short press
+  - Turn the device on
   - Toggle vibration but don't disable alert state
   - Print device info
 
-- Reboot on action button long press
+- Turn the device off on action button long press
 
 TODO:
 
@@ -349,4 +349,3 @@ while True:
         connect()
     else:
         wait_for_connection()
-    
