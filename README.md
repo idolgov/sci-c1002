@@ -58,3 +58,7 @@ first:
 Now install the code and required libraries on the device:
 
     make install
+
+## License
+
+This project is released using the MIT license.
