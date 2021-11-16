@@ -35,7 +35,7 @@ env:
 	. env/bin/activate && pip3 install -r requirements.txt
 
 lint:
-	. env/bin/activate && black -l 80 --check --diff *.py && pylint -j0 *.py
+	. env/bin/activate && black -l 80 --color --check --diff *.py && pylint -j0 *.py
 
 install:
 	@if [ -z "${CIRCUITPYTHON_PATH}" ]; then echo "Device missing!" && false; fi

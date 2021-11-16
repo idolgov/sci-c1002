@@ -40,6 +40,8 @@ TODO:
 - Try decreasing connection and advertising intervals to improve
   RSSI accuracy and stability
   - connection.connection_interval can be x*1.25
+
+- Always alert when not connected
 """
 
 import time
@@ -91,7 +93,7 @@ COLORS = {
 
 BLE_MAC_CENTRAL = "f4:a7:b4:0b:c7:36"
 BLE_MAC_PERIPHERAL = "e2:6d:58:bd:ec:4b"
-BLE_RSSI_THRESHOLD = -60
+BLE_RSSI_THRESHOLD = -80
 
 LED_STATUS_SECONDS = 5
 
@@ -117,7 +119,7 @@ ble = BLERadio()
 
 ble_is_central = d5.value
 ble_connection = None
-ble_rssi = 0
+ble_rssi = []
 btn_state = btn.value
 btn_timestamp = 0
 alert_state = False
@@ -175,18 +177,26 @@ def connect():
     global ble_rssi, alert_state
     connection = None
 
-    for adv in ble.start_scan(ProvideServicesAdvertisement, timeout=1):
+    for adv in ble.start_scan(
+        ProvideServicesAdvertisement, timeout=1, minimum_rssi=-100
+    ):
         if UARTService not in adv.services:
             continue
 
         addr = bytes_to_mac(adv.address.address_bytes)
-        ble_rssi = adv.rssi
+        ble_rssi.append(adv.rssi)
+        if len(ble_rssi) > 10:
+            ble_rssi.pop(0)
+        mean_rssi = 0
+        for i in ble_rssi:
+            mean_rssi = mean_rssi + i
+        mean_rssi = mean_rssi / len(ble_rssi)
 
         if addr != BLE_MAC_PERIPHERAL:
             continue
 
         # Our peripheral device is too far away!
-        if ble_rssi and ble_rssi < BLE_RSSI_THRESHOLD:
+        if mean_rssi and mean_rssi < BLE_RSSI_THRESHOLD:
             # Alert was not in effect
             if not alert_state:
                 alert_state = True
@@ -198,8 +208,12 @@ def connect():
             # We need to infor the device that alert is over
             if alert_state:
                 alert_state = False
-                connection = ble.connect(adv)
-                print(f"Connected to {addr}")
+                try:
+                    connection = ble.connect(adv)
+                    print(f"Connected to {addr}")
+                except:
+                    print("Connection failed")
+                    ble_rssi = []
                 break
 
     ble.stop_scan()
@@ -215,7 +229,8 @@ def connect():
         print(f"Sending alert state: {alert_state}")
         uart.write(str(int(alert_state)).encode("utf-8"))
     except:
-        print("Connected failed!")
+        print("Connection failed!")
+        ble_rssi = []
     finally:
         connection.disconnect()
 
@@ -272,7 +287,6 @@ def shutdown():
 
 
 def print_info():
-    """Print device info."""
     print("\nLapsipaimen\n===========")
 
     serial = binascii.hexlify(microcontroller.cpu.uid).decode("utf8")
