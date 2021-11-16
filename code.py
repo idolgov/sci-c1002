@@ -1,4 +1,3 @@
-# Write your code here :-)
 """Lapsipaimen proto based on Adafruit Feather M0 Express.
 
 Features:
@@ -17,10 +16,11 @@ Features:
   - Blink yellow LED every second
 
 - Action button short press
+  - Turn the device on
   - Toggle vibration but don't disable alert state
   - Print device info
 
-- Reboot on action button long press
+- Turn the device off on action button long press
 
 TODO:
 
@@ -177,7 +177,9 @@ def connect():
     global ble_rssi, alert_state
     connection = None
 
-    for adv in ble.start_scan(ProvideServicesAdvertisement, timeout=1, minimum_rssi=-100):
+    for adv in ble.start_scan(
+        ProvideServicesAdvertisement, timeout=1, minimum_rssi=-100
+        ):
         if UARTService not in adv.services:
             continue
 
@@ -189,8 +191,6 @@ def connect():
         for i in ble_rssi:
             mean_rssi = mean_rssi + i
         mean_rssi = mean_rssi / len(ble_rssi)
-        
-        print(mean_rssi)
 
         if addr != BLE_MAC_PERIPHERAL:
             continue
@@ -349,4 +349,3 @@ while True:
         connect()
     else:
         wait_for_connection()
-    
