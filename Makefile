@@ -11,7 +11,7 @@ BUNDLE_DIR:=adafruit-circuitpython-bundle-7.x-mpy-${BUNDLE_VERSION}
 BUNDLE_URL:=${BUNDLE_DOWNLOAD_URL}/${BUNDLE_VERSION}/${BUNDLE_DIR}.zip
 BUNDLE_LIBS:=*/lib/adafruit_ble/* */lib/adafruit_drv2605.mpy */lib/neopixel.mpy
 
-BOOTLOADER_PATH?=${shell findmnt -rn -S LABEL=FEATHERBOOT -o TARGET}
+BOOTLOADER_PATH?=${shell findmnt -rn -S LABEL=FTHR840BOOT -o TARGET}
 CIRCUITPYTHON_PATH?=${shell findmnt -rn -S LABEL=CIRCUITPY -o TARGET}
 
 firmware:
