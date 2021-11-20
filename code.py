@@ -95,6 +95,8 @@ BLE_MAC_CENTRAL = "f4:a7:b4:0b:c7:36"
 BLE_MAC_PERIPHERAL = "e2:6d:58:bd:ec:4b"
 BLE_RSSI_THRESHOLD = -80
 LOW_BATTERY_THRESHOLD = 3.6
+MEASURED_POWER = -58
+ENVIRONMENTAL_FACTOR = 3
 
 LED_STATUS_SECONDS = 5
 
@@ -120,6 +122,7 @@ ble = BLERadio()
 
 ble_is_central = d5.value
 ble_rssi = []
+mean_rssi = 0
 btn_state = btn.value
 btn_timestamp = 0
 alert_state = False
@@ -182,7 +185,7 @@ def connect():
     """
     # print(f"Connecting...")
 
-    global ble_rssi, alert_state
+    global ble_rssi, alert_state, mean_rssi
     connection = None
 
     for adv in ble.start_scan(
@@ -192,17 +195,18 @@ def connect():
             continue
 
         addr = bytes_to_mac(adv.address.address_bytes)
+        if addr != BLE_MAC_PERIPHERAL:
+            continue
         time.sleep(0.2)
+
         ble_rssi.append(adv.rssi)
         if len(ble_rssi) > 10:
             ble_rssi.pop(0)
+
         mean_rssi = 0
         for i in ble_rssi:
             mean_rssi = mean_rssi + i
         mean_rssi = mean_rssi / len(ble_rssi)
-
-        if addr != BLE_MAC_PERIPHERAL:
-            continue
 
         # Our peripheral device is too far away!
         if mean_rssi and mean_rssi < BLE_RSSI_THRESHOLD:
@@ -298,6 +302,15 @@ def shutdown():
     )
 
 
+def distance():
+    if mean_rssi:
+        dist = 10 ** (
+            (MEASURED_POWER - mean_rssi) / (10 * ENVIRONMENTAL_FACTOR)
+        )
+        return dist
+    return "N/A"
+
+
 def print_info():
     print("\nLapsipaimen\n===========")
 
@@ -312,6 +325,7 @@ def print_info():
     print(f"BLE mode: {'Central' if ble_is_central else 'Peripheral'}")
     print(f"BLE address: {bytes_to_mac(ble._adapter.address.address_bytes)}")
     print(f"BLE signal strength: {ble_rssi if ble_rssi else 'N/A'}")
+    print(f"Approximate distance: {distance()}")
     print(f"BLE signal threshold: {BLE_RSSI_THRESHOLD}")
     print(f"LiPo voltage: {lipo_voltage:.2f}V")
     print(f"Powered by {os.uname().machine}\n")
