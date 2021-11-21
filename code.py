@@ -52,8 +52,8 @@ COLORS = {
 
 BLE_MAC_CENTRAL = "f4:a7:b4:0b:c7:36"
 BLE_MAC_PERIPHERAL = "e2:6d:58:bd:ec:4b"
-BLE_RSSI_THRESHOLD = -79
-BLE_RSSI_SAMPLES = 6
+BLE_RSSI_THRESHOLD = -77
+BLE_RSSI_SAMPLES = 5
 ALERT_STATE_SAMPLES = 10
 LOW_BATTERY_THRESHOLD = 3.6
 MEASURED_POWER = -58
@@ -85,7 +85,7 @@ ble_rssis = []
 ble_rssi_mean = 0
 btn_state = btn.value
 btn_timestamp = 0
-alert_state = 0
+alert_state = None
 alert_states = []
 alert_timestamp = 0
 silent = False
@@ -94,6 +94,7 @@ status_timestamp = time.monotonic()
 if not ble_is_central:
     uart = UARTService()
     advertisement = ProvideServicesAdvertisement(uart)
+    advertisement.tx_power = 0  # -20 to +4 dBm in 4 dB steps
 
 
 def vibrate(effect=HAPTIC_EFFECT_NOTIFY, level=HAPTIC_EFFECT_NOTIFY_LEVEL):
@@ -141,7 +142,7 @@ def update_state(rssi):
     """Update the alarm state according to the new RSSI value.
 
     In addition to calculating mean of RSSI samples, we change
-    the alarm state only if it is consistent enough.
+    the alert state only if it is consistent enough.
 
     Return True if alert state has changed and False otherwise.
     """
@@ -169,7 +170,7 @@ def update_state(rssi):
     # We've measured enough consecutive states
     if all(alert_states) or not any(alert_states):
         # Current state has changed
-        if alert_state != new_state:
+        if alert_state is None or alert_state != new_state:
             alert_state = new_state
 
             return True
@@ -184,7 +185,7 @@ def connect():
     returned into allowed radius in order to trigger or dismiss an
     alert.
     """
-    global ble_rssis
+    global ble_rssis, alert_states
 
     connection = None
 
@@ -213,8 +214,8 @@ def connect():
 
             print("Connected!")
             break
-        except:
-            print("Connection failed!")
+        except Exception as e:
+            print(f"Connection failed: {e}")
             continue
     else:
         print("No devices found!")
@@ -223,6 +224,7 @@ def connect():
     ble.stop_scan()
 
     if not connection:
+        time.sleep(0.05)
         return
 
     print_info()
@@ -231,12 +233,13 @@ def connect():
     try:
         uart = connection[UARTService]  # pylint: disable=redefined-outer-name
         uart.write(ble._adapter.address.address_bytes)
-        time.sleep(0.2)
+        time.sleep(0.3)
         print(f"Sending alert state: {alert_state}")
         uart.write(str(alert_state).encode("utf-8"))
-    except:
-        print("Connection failed!")
-        ble_rssis = []
+    except Exception as e:
+        print(f"Connection failed: {e}")
+
+        ble_rssis, alert_states = [], []
     finally:
         connection.disconnect()
 
@@ -264,7 +267,7 @@ def wait_for_connection():
 
         if data:
             # Receive state
-            alert_state = bool(int(data))
+            alert_state = int(data)
 
             print(f"Received alert state: {alert_state}")
 
@@ -376,3 +379,5 @@ while True:
         connect()
     else:
         wait_for_connection()
+
+    time.sleep(0.1)
