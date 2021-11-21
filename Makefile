@@ -1,6 +1,6 @@
 BOARD?=feather_nrf52840_express
 
-FIRMWARE_VERSION?=7.0.0
+FIRMWARE_VERSION?=7.1.0-beta.0
 FIRMWARE_FILE:=firmware-${FIRMWARE_VERSION}.uf2
 FIRMWARE_REMOTE_FILE:=adafruit-circuitpython-${BOARD}-en_US-${FIRMWARE_VERSION}.uf2
 FIRMWARE_URL:=https://downloads.circuitpython.org/bin/${BOARD}/en_US/${FIRMWARE_REMOTE_FILE}
