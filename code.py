@@ -1,42 +1,6 @@
 """Lapsipaimen proto based on Adafruit Feather M0 Express.
 
-Features:
-
-- Startup
-  - Short haptic feedback
-  - Blink cyan LED once
-  - Start connecting or waiting for BLE connection
-  - Device is initially in alert state
-
-- Calculate distance instead of just measuring RSSI
-  - Distance == 10^((Measured power – RSSI)/(10 * N))
-    - Measured power == 1m RSSI of the BLE chip
-    - N == environmental factor, 2-4
-
-- Peripherial device is nearby
-  - Blink blue LED every 4-5s
-  - Disable haptic alert if it is on
-
-- Peripherial device is too far away
-  - Enable haptic alert
-  - Blink yellow LED every second
-
-- Action button short press
-  - Turn the device on
-  - Toggle vibration but don't disable alert state
-  - Print device info
-
-- Turn the device off on action button long press
-
-- Low battery alert
-  - Threshold for low battery currently 3.6 V
-  - Blink red LED instead of blue every 4-5s when voltage too low
-
-TODO:
-
-- Implement lower and upper thresholds for RSSI/distance
-  - ATM alerts are too sensitive near the single threshold
-  - use lower one when alert is on and higher one when it is off
+https://github.com/idolgov/sci-c1002
 """
 
 import time
