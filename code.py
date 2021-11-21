@@ -52,9 +52,9 @@ COLORS = {
 
 BLE_MAC_CENTRAL = "f4:a7:b4:0b:c7:36"
 BLE_MAC_PERIPHERAL = "e2:6d:58:bd:ec:4b"
-BLE_RSSI_THRESHOLD = -78
-BLE_RSSI_SAMPLES = 8
-ALERT_STATE_SAMPLES = 5
+BLE_RSSI_THRESHOLD = -79
+BLE_RSSI_SAMPLES = 6
+ALERT_STATE_SAMPLES = 10
 LOW_BATTERY_THRESHOLD = 3.6
 MEASURED_POWER = -58
 ENVIRONMENTAL_FACTOR = 3
@@ -85,7 +85,7 @@ ble_rssis = []
 ble_rssi_mean = 0
 btn_state = btn.value
 btn_timestamp = 0
-alert_state = False
+alert_state = 0
 alert_states = []
 alert_timestamp = 0
 silent = False
@@ -152,9 +152,10 @@ def update_state(rssi):
         ble_rssis.pop(0)
 
     ble_rssi_mean = sum(ble_rssis) / len(ble_rssis)
-    new_state = ble_rssi_mean < BLE_RSSI_THRESHOLD
+    new_state = int(ble_rssi_mean < BLE_RSSI_THRESHOLD)
 
     alert_states.append(new_state)
+    # print(alert_states)
     if len(alert_states) > ALERT_STATE_SAMPLES:
         alert_states.pop(0)
 
@@ -232,7 +233,7 @@ def connect():
         uart.write(ble._adapter.address.address_bytes)
         time.sleep(0.2)
         print(f"Sending alert state: {alert_state}")
-        uart.write(str(int(alert_state)).encode("utf-8"))
+        uart.write(str(alert_state).encode("utf-8"))
     except:
         print("Connection failed!")
         ble_rssis = []
@@ -312,7 +313,7 @@ def print_info():
     lipo_voltage = (lipo_voltage_raw.value * 3.6) / 65536 * 2
 
     print(f"State: {'ALARMING' if alert_state else 'NORMAL'}")
-    print(f"Measured alert states: {alert_states}")
+    print(f"Measured alert states: {alert_states if alert_states else 'N/A'}")
     print(f"Mute: {silent}")
     print(f"BLE mode: {'Central' if ble_is_central else 'Peripheral'}")
     print(f"BLE address: {bytes_to_mac(ble._adapter.address.address_bytes)}")
