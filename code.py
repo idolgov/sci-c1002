@@ -1,47 +1,6 @@
 """Lapsipaimen proto based on Adafruit Feather M0 Express.
 
-Features:
-
-- Startup
-  - Short haptic feedback
-  - Blink cyan LED once
-  - Start connecting or waiting for BLE connection
-
-- Peripherial device is nearby
-  - Blink blue LED every 4-5s
-  - Disable haptic alert if it is on
-
-- Peripherial device is too far away
-  - Enable haptic alert
-  - Blink yellow LED every second
-
-- Action button short press
-  - Turn the device on
-  - Toggle vibration but don't disable alert state
-  - Print device info
-
-- Turn the device off on action button long press
-
-- Low battery alert
-  - Threshold for low battery currently 3.6 V
-  - Blink red LED instead of blue every 4-5s when voltage too low
-
-TODO:
-
-- Implement lower and upper thresholds for RSSI/distance
-  - ATM alerts are too sensitive near the single threshold
-  - use lower one when alert is on and higher one when it is off
-
-- Calculate distance instead of just measuring RSSI
-  - Distance == 10^((Measured power – RSSI)/(10 * N))
-    - Measured power == 1m RSSI of the BLE chip
-    - N == environmental factor, 2-4
-
-- Try decreasing connection and advertising intervals to improve
-  RSSI accuracy and stability
-  - connection.connection_interval can be x*1.25
-
-- Always alert when not connected
+https://github.com/idolgov/sci-c1002
 """
 
 import time
@@ -93,11 +52,12 @@ COLORS = {
 
 BLE_MAC_CENTRAL = "f4:a7:b4:0b:c7:36"
 BLE_MAC_PERIPHERAL = "e2:6d:58:bd:ec:4b"
-BLE_RSSI_THRESHOLD = -80
+BLE_RSSI_THRESHOLD = -77
+BLE_RSSI_SAMPLES = 5
+ALERT_STATE_SAMPLES = 10
 LOW_BATTERY_THRESHOLD = 3.6
 MEASURED_POWER = -58
 ENVIRONMENTAL_FACTOR = 3
-
 LED_STATUS_SECONDS = 5
 
 # Initialize I2C bus
@@ -121,11 +81,12 @@ pixels = neopixel.NeoPixel(board.NEOPIXEL, 1)
 ble = BLERadio()
 
 ble_is_central = d5.value
-ble_rssi = []
-mean_rssi = 0
+ble_rssis = []
+ble_rssi_mean = 0
 btn_state = btn.value
 btn_timestamp = 0
-alert_state = False
+alert_state = None
+alert_states = []
 alert_timestamp = 0
 silent = False
 status_timestamp = time.monotonic()
@@ -133,6 +94,7 @@ status_timestamp = time.monotonic()
 if not ble_is_central:
     uart = UARTService()
     advertisement = ProvideServicesAdvertisement(uart)
+    advertisement.tx_power = 0  # -20 to +4 dBm in 4 dB steps
 
 
 def vibrate(effect=HAPTIC_EFFECT_NOTIFY, level=HAPTIC_EFFECT_NOTIFY_LEVEL):
@@ -176,6 +138,46 @@ def bytes_to_mac(addr_bytes):
     return ":".join(f"{b:02x}" for b in reversed(addr_bytes))
 
 
+def update_state(rssi):
+    """Update the alarm state according to the new RSSI value.
+
+    In addition to calculating mean of RSSI samples, we change
+    the alert state only if it is consistent enough.
+
+    Return True if alert state has changed and False otherwise.
+    """
+    global alert_state, ble_rssi_mean
+
+    ble_rssis.append(rssi)
+    if len(ble_rssis) > BLE_RSSI_SAMPLES:
+        ble_rssis.pop(0)
+
+    ble_rssi_mean = sum(ble_rssis) / len(ble_rssis)
+    new_state = int(ble_rssi_mean < BLE_RSSI_THRESHOLD)
+
+    alert_states.append(new_state)
+    # print(alert_states)
+    if len(alert_states) > ALERT_STATE_SAMPLES:
+        alert_states.pop(0)
+
+    # Not enough measurements yet, abort
+    if (
+        len(ble_rssis) < BLE_RSSI_SAMPLES
+        or len(alert_states) + 1 < ALERT_STATE_SAMPLES
+    ):
+        return False
+
+    # We've measured enough consecutive states
+    if all(alert_states) or not any(alert_states):
+        # Current state has changed
+        if alert_state is None or alert_state != new_state:
+            alert_state = new_state
+
+            return True
+
+    return False
+
+
 def connect():
     """Try to connect to a peripheral device.
 
@@ -183,67 +185,61 @@ def connect():
     returned into allowed radius in order to trigger or dismiss an
     alert.
     """
-    # print(f"Connecting...")
+    global ble_rssis, alert_states
 
-    global ble_rssi, alert_state, mean_rssi
     connection = None
+
+    # print("Scanning...")
 
     for adv in ble.start_scan(
         ProvideServicesAdvertisement, timeout=1, minimum_rssi=-100
     ):
-        if UARTService not in adv.services:
-            continue
-
+        # Check that we are connecting to the right device
         addr = bytes_to_mac(adv.address.address_bytes)
         if addr != BLE_MAC_PERIPHERAL:
             continue
-        time.sleep(0.2)
 
-        ble_rssi.append(adv.rssi)
-        if len(ble_rssi) > 10:
-            ble_rssi.pop(0)
+        # Check if we can communicate with the device
+        if not hasattr(adv, "services") or not UARTService in adv.services:
+            continue
 
-        mean_rssi = 0
-        for i in ble_rssi:
-            mean_rssi = mean_rssi + i
-        mean_rssi = mean_rssi / len(ble_rssi)
+        # Abort scaning if state has not changed
+        if not update_state(adv.rssi):
+            break
 
-        # Our peripheral device is too far away!
-        if mean_rssi and mean_rssi < BLE_RSSI_THRESHOLD:
-            # Alert was not in effect
-            if not alert_state:
-                alert_state = True
-                connection = ble.connect(adv)
-                print(f"Connected to {addr}")
-                break
-        # Our peripheral device is back!
-        else:
-            # We need to infor the device that alert is over
-            if alert_state:
-                alert_state = False
-                try:
-                    connection = ble.connect(adv)
-                    print(f"Connected to {addr}")
-                except:
-                    print("Connection failed")
-                    ble_rssi = []
-                break
+        try:
+            print(f"Connecting to {addr}...")
+
+            connection = ble.connect(adv)
+
+            print("Connected!")
+            break
+        except Exception as e:
+            print(f"Connection failed: {e}")
+            continue
+    else:
+        print("No devices found!")
+        update_state(BLE_RSSI_THRESHOLD - 1)
 
     ble.stop_scan()
 
     if not connection:
+        time.sleep(0.05)
         return
+
+    print_info()
 
     # Send own MAC address and alert state
     try:
         uart = connection[UARTService]  # pylint: disable=redefined-outer-name
         uart.write(ble._adapter.address.address_bytes)
-        time.sleep(0.2)
+        time.sleep(0.3)
         print(f"Sending alert state: {alert_state}")
-        uart.write(str(int(alert_state)).encode("utf-8"))
-    except:
-        print("Connection failed!")
-        ble_rssi = []
+        uart.write(str(alert_state).encode("utf-8"))
+    except Exception as e:
+        print(f"Connection failed: {e}")
+
+        ble_rssis, alert_states = [], []
     finally:
         connection.disconnect()
 
@@ -255,10 +251,10 @@ def wait_for_connection():
     if not ble._adapter.advertising:
         print("Connecting...")
 
-        ble.start_advertising(advertisement)
+        ble.start_advertising(advertisement=advertisement, scan_response=None)
 
     if not ble.connected:
-        time.sleep(0.5)
+        time.sleep(0.2)
         return
 
     # Receive MAC address of the central
@@ -271,7 +267,7 @@ def wait_for_connection():
 
         if data:
             # Receive state
-            alert_state = bool(int(data))
+            alert_state = int(data)
 
             print(f"Received alert state: {alert_state}")
 
@@ -298,17 +294,19 @@ def shutdown():
     # Release the BTN pin
     btn.deinit()
     alarm.exit_and_deep_sleep_until_alarms(
-        alarm.pin.PinAlarm(BTN, value=False, pull=True),
+        alarm.pin.PinAlarm(pin=BTN, value=False, pull=True),
     )
 
 
 def distance():
-    if mean_rssi:
+    dist = None
+
+    if ble_rssi_mean:
         dist = 10 ** (
-            (MEASURED_POWER - mean_rssi) / (10 * ENVIRONMENTAL_FACTOR)
+            (MEASURED_POWER - ble_rssi_mean) / (10 * ENVIRONMENTAL_FACTOR)
         )
-        return dist
-    return "N/A"
+
+    return f"{dist:.2f}m" if dist else "N/A"
 
 
 def print_info():
@@ -318,16 +316,19 @@ def print_info():
     lipo_voltage = (lipo_voltage_raw.value * 3.6) / 65536 * 2
 
     print(f"State: {'ALARMING' if alert_state else 'NORMAL'}")
-    print(f"Silent: {silent}")
-    print(f"Serial number: {serial}")
-    print(f"Temperature: {microcontroller.cpu.temperature:.1f}C")
-    print(f"Free RAM: {gc.mem_free()/1024:.1f}KB")  # pylint: disable=no-member
+    print(f"Measured alert states: {alert_states if alert_states else 'N/A'}")
+    print(f"Mute: {silent}")
     print(f"BLE mode: {'Central' if ble_is_central else 'Peripheral'}")
     print(f"BLE address: {bytes_to_mac(ble._adapter.address.address_bytes)}")
-    print(f"BLE signal strength: {ble_rssi if ble_rssi else 'N/A'}")
+    print(f"BLE TX power: {ble.tx_power}dBm")
+    print(f"BLE RSSI samples: {ble_rssis if ble_rssis else 'N/A'}")
+    print(f"BLE RSSI mean: {ble_rssi_mean if ble_rssi_mean else 'N/A'}")
+    print(f"BLE RSSI threshold: {BLE_RSSI_THRESHOLD}")
     print(f"Approximate distance: {distance()}")
-    print(f"BLE signal threshold: {BLE_RSSI_THRESHOLD}")
+    print(f"Temperature: {microcontroller.cpu.temperature:.1f}C")
+    print(f"Free RAM: {gc.mem_free()/1024:.1f}KB")  # pylint: disable=no-member
     print(f"LiPo voltage: {lipo_voltage:.2f}V")
+    print(f"Serial number: {serial}")
     print(f"Powered by {os.uname().machine}\n")
 
 
@@ -378,3 +379,5 @@ while True:
         connect()
     else:
         wait_for_connection()
+
+    time.sleep(0.1)

@@ -1,10 +1,46 @@
-# SCI-C1002 User-driver product development project: Lapsipaimen
+# SCI-C1002 User-driven product development project: Lapsipaimen
 
 ![Tests](https://github.com/idolgov/sci-c1002/actions/workflows/test.yaml/badge.svg)
 
 An early prototype of a vibration bracelet for helping parents to stress less
 about kids getting lost, developed as part of the SCI-C1002 course of Aalto
 University.
+
+## Features
+
+- Startup
+  - Short haptic feedback
+  - Blink cyan LED once
+  - Start connecting or waiting for a connection
+  - Device is initially in alert state
+
+- Peripherial device is nearby
+  - Blink blue LED every 4-5s
+  - Disable haptic alert if it is on
+
+- Peripherial device is too far away
+  - Enable haptic alert
+  - Blink yellow LED every second
+
+- Action button short press
+  - Turn the device on
+  - Toggle vibration but don't disable alert state
+  - Print device info
+
+- Turn the device off on action button long press
+
+- Calculate approximate distance
+  - Distance == 10^((Measured power – RSSI)/(10 * N))
+    - Measured power == 1m RSSI of the BLE chip
+    - N == environmental factor, 2-4
+
+- Low battery indicator
+  - Threshold for low battery currently 3.6 V
+  - Blink red LED instead of blue every 4-5s when voltage too low
+
+### TODO
+
+- [ ] Peripheral device: alert when not connected
 
 ## Components
 
@@ -47,6 +83,8 @@ Linux machine plug a device in with a USB cable and run:
 
     make firmware
     make flash
+    
+> In case of multiple connected devices define `BOOTLOADER_PATH` env var.
 
 Before uploading new code to the device, check it for formatting and some other
 errors, you'll need to create a python virtual environment with dependencies
@@ -58,6 +96,8 @@ first:
 Now install the code and required libraries on the device:
 
     make install
+    
+> In case of multiple connected devices define `CIRCUITPYTHON_PATH` env var.
 
 ## License
 
